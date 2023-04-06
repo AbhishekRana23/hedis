@@ -41,6 +41,9 @@ import Database.Redis.Commands
     , ClusterSlotsResponse(..)
     , ClusterSlotsResponseEntry(..)
     , ClusterSlotsNode(..))
+import System.Environment (lookupEnv)
+import Data.Maybe (fromMaybe)
+import Text.Read (readMaybe)
 
 --------------------------------------------------------------------------------
 -- Connection
@@ -278,16 +281,17 @@ refreshShardMapWithNodeConn :: [Cluster.NodeConnection] -> IO ShardMap
 refreshShardMapWithNodeConn [] = throwIO $ ClusterConnectError (Error "Couldn't refresh shardMap due to connection error")
 refreshShardMapWithNodeConn ((Cluster.NodeConnection ctx _ _) : xs) = do
     pipelineConn <- PP.fromCtx ctx
-    raceResult <- race (threadDelay (10^(3 :: Int))) (try $ refreshShardMapWithConn pipelineConn True) -- racing with delay of 1 ms 
+    envTimeout <- fromMaybe (10 ^ (3 :: Int)) . (>>= readMaybe) <$> lookupEnv "REDIS_CLUSTER_SLOTS_TIMEOUT"
+    raceResult <- race (threadDelay envTimeout) (try $ refreshShardMapWithConn pipelineConn True) -- racing with delay of 1 ms 
     case raceResult of
         Left () -> do
-            print $ "TimeoutForConnection " <> show ctx 
+            print $ "TimeoutForConnection " <> show ctx
             refreshShardMapWithNodeConn xs
-        Right eiShardMapResp -> 
+        Right eiShardMapResp ->
             case eiShardMapResp of
-                Right shardMap -> pure shardMap 
+                Right shardMap -> pure shardMap
                 Left (err :: SomeException) -> do
-                    print $ "ShardMapRefreshError-" <> show err 
+                    print $ "ShardMapRefreshError-" <> show err
                     refreshShardMapWithNodeConn xs
 
 refreshShardMapWithConn :: PP.Connection -> Bool -> IO ShardMap
@@ -296,6 +300,6 @@ refreshShardMapWithConn pipelineConn _ = do
     slotsResponse <- runRedisInternal pipelineConn clusterSlots
     case slotsResponse of
         Left e -> throwIO $ ClusterConnectError e
-        Right slots -> case clusterSlotsResponseEntries slots of 
+        Right slots -> case clusterSlotsResponseEntries slots of
             [] -> throwIO $ ClusterConnectError $ SingleLine "empty slotsResponse"
             _ -> shardMapFromClusterSlotsResponse slots
