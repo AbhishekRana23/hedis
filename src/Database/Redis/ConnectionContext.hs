@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 module Database.Redis.ConnectionContext (
     ConnectionContext(..)
   , ConnectTimeout(..)
@@ -138,7 +139,7 @@ recv (TLSContext ctx) = TLS.recvData ctx
 
 
 ioErrorToConnLost :: IO a -> IO a
-ioErrorToConnLost a = a `catchIOError` (\x -> putStrLn ("exception while running redis query: " <> show x) *> errConnClosed)
+ioErrorToConnLost a = a `catchIOError` (\x -> print @String ("exception while running redis query: " <> show x) *> errConnClosed)
 
 errConnClosed :: IO a
 errConnClosed = throwIO ConnectionLost

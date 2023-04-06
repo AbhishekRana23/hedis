@@ -4,6 +4,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Database.Redis.Cluster
   ( Connection(..)
   , NodeRole(..)
@@ -446,7 +447,7 @@ requestNode (NodeConnection ctx lastRecvRef _) requests = do
     eresp <- race requestNodeImpl (threadDelay envTimeout)
     case eresp of
       Left e -> return e
-      Right _ -> putStrLn "timeout happened" *> throwIO NoNodeException
+      Right _ -> print @String "timeout happened" *> throwIO NoNodeException
 
     where
     requestNodeImpl :: IO [Reply]
